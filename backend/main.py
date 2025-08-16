@@ -2,6 +2,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
+from readability import Document
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,14 +67,16 @@ def add_link(link: LinkCreate):
         page = requests.get(link.url, headers=headers)
         page.raise_for_status()  # Raise an exception for bad status codes
 
-        # Parse the HTML and get the title
-        soup = BeautifulSoup(page.content, 'html.parser')
-        title = soup.title.string if soup.title else "No title found"
+        # Use readability to parse the main content and title
+        doc = Document(page.text)
+        title = doc.title()
+        content = doc.summary(html_partial=True) # Get clean HTML content
 
         # Insert into Supabase
         response = supabase.table('links').insert({
             "url": link.url,
-            "title": title
+            "title": title,
+            "content": content
         }).execute()
 
         # Check for errors in the response
@@ -83,5 +86,16 @@ def add_link(link: LinkCreate):
         return response.data[0]
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/links/{link_id}")
+def get_link(link_id: int):
+    """Fetches a single link by its ID."""
+    try:
+        response = supabase.table('links').select("*").eq('id', link_id).single().execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Link not found")
+        return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

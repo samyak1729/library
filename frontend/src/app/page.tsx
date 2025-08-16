@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Toaster, toast } from "sonner";
+import Link from "next/link";
 
 // Define the type for a single link object
 interface Link {
@@ -116,24 +117,21 @@ export default function Home() {
         <div className="w-full max-w-4xl grid gap-4">
           {links.length > 0 ? (
             links.map((link) => (
-              <Card key={link.id} className="shadow-sm hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-lg">{link.title}</CardTitle>
-                  <CardDescription className="text-xs pt-2">
-                    Added on: {new Date(link.created_at).toLocaleString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-                  >
-                    {link.url}
-                  </a>
-                </CardContent>
-              </Card>
+              <Link href={`/read/${link.id}`} key={link.id}>
+                <Card className="shadow-sm hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{link.title}</CardTitle>
+                    <CardDescription className="text-xs pt-2">
+                      Added on: {new Date(link.created_at).toLocaleString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 break-all">
+                      {link.url}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
             ))
           ) : (
             <div className="text-center text-slate-500 dark:text-slate-400 py-8">
