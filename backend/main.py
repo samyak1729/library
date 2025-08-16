@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
+import google.generativeai as genai
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,6 +35,32 @@ app.add_middleware(
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
+
+# Configure Gemini AI
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+def get_category_from_ai(content: str) -> str:
+    """Uses the Gemini API to categorize the article content."""
+    prompt = '''
+    Based on the following article content, classify it into ONE of the following categories:
+    "Technology", "History", "Health & Wellness", "Science", "Business & Finance", "Arts & Culture", "Productivity", "Other".
+    Return only the category name as a single string, and nothing else.
+
+    Article Content:
+    ---
+    {content}
+    ---
+    '''
+    try:
+        # Limit content length to avoid exceeding API limits
+        response = model.generate_content(prompt.format(content=content[:10000]))
+        return response.text.strip()
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        return "Other" # Default category on error
+
 
 # Pydantic models for request bodies
 class LinkCreate(BaseModel):
@@ -70,13 +97,18 @@ def add_link(link: LinkCreate):
         # Use readability to parse the main content and title
         doc = Document(page.text)
         title = doc.title()
-        content = doc.summary(html_partial=True) # Get clean HTML content
+        content_html = doc.summary(html_partial=True)
+        content_text = BeautifulSoup(content_html, 'html.parser').get_text(strip=True, separator=' ')
+
+        # Get category from AI
+        category = get_category_from_ai(content_text)
 
         # Insert into Supabase
         response = supabase.table('links').insert({
             "url": link.url,
             "title": title,
-            "content": content
+            "content": content_html,
+            "category": category
         }).execute()
 
         # Check for errors in the response
